@@ -1,0 +1,10 @@
+unpacker="/u/land/fake_cvmfs/11/extra_jan24p1/upexps/202507_sfrs/202507_sfrs"
+#unpacker="/u/land/fake_cvmfs/11/extra_jan24p1/upexps_202506_g249/upexps/run/run_all --input-buffer=138Mi"
+source="stream://lxir133:7723"  
+port=8889
+
+losparams={
+ "LOS1":{}, 
+ "LOS2":{},
+ "LOS3":{},
+ }

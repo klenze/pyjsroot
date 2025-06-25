@@ -1,2 +1,5 @@
 *.swp
 __pycache__/
+*.json
+config.py
+.gdb_history
