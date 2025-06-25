@@ -1,9 +1,10 @@
 #!/usr/bin/env -S python3 -i
 import numpy
 import h101
+import h101.tdc_cal
 import numpy as np
 from numpy.linalg import norm
-
+import re
 import math
 from math import *
 import ROOT
@@ -17,6 +18,7 @@ from functools import partial
 import os.path
 import signal
 
+from time import sleep
 
 import online_base
 import online_los
@@ -46,8 +48,12 @@ lmap=lambda *a,**kw:list(map(*a, **kw))
 unpacker="/u/land/fake_cvmfs/11/extra_jan24p1/upexps_202506_g249/upexps/run/run_all --input-buffer=138Mi"
 lmd="/lustre/r3b/202506_g249/lmd_stitched/main0102_0001.lmd"  # rolu 10mm x 10mm
 #lmd="/lustre/r3b/202506_g249/lmd_stitched/main0098_0001.lmd" # run with rolu closed to 1mm x 1mm
+d=None
 
 def main():
+   global end, d
+   h101.tdc_cal.readcals("cal.json")
+   h101.tdc_cal.filterre=re.compile("LOS.*")
    h=h101.mkh101(inputs=lmd, unpacker=unpacker)
    h.tpat_mask=0x1
    d=h.getdict()
@@ -57,7 +63,7 @@ def main():
       exit(1)
    online_base.http_inst=ROOT.THttpServer("http:5599")
    los=online_los.online_los("LOS", d["LOS1VT"], d["LOS1TT_tot"], offset=0)
-   los.vftx_offsets=[float("nan"), -2.102, -1.215, -0.5124, 0.08364,
+   los.vftxoffsets=[float("nan"), -2.102, -1.215, -0.5124, 0.08364,
                     0.02885, 1.073, 1.845, 0.8041]
    los.tot_scale=np.array([float("nan"), 544.6, 546.1, 546.3, 545.2, 546.0, 552.9, 552.2, 548.5])
    los.tot_scale/=sum(los.tot_scale[1:9])/8
@@ -69,6 +75,8 @@ def main():
       if (not n%100):
           print(m, n)
           ROOT.gSystem.ProcessEvents()
+          if not n%12000:
+               h101.tdc_cal.writecals("cal.json")
       if len(TPAT)!=1 or not TPAT[0]&1:
           continue
       #if 1 not in LOS1TT_tot.keys():
@@ -77,6 +85,10 @@ def main():
       for on in onlines:
           on.process()
       m+=1
+   end=False
+   while not end:
+      ROOT.gSystem.ProcessEvents()
+      sleep(0.01)
 
 
 if __name__=="__main__":

@@ -2,6 +2,10 @@ import online_base
 from numpy import isnan, nan
 from functools import partial
 from math import pi, sin, cos
+import numpy as np
+from numpy.linalg import lstsq # linear
+
+#from scipy.optimize import least_squares # non-linear
 
 __tern__=lambda p, then, otherwise: [otherwise, then][bool(p)]
 
@@ -21,9 +25,9 @@ class online_los(online_base.online_base):
         # stuff which is useful in multiple places and will be set by onEvent:
         self.tamexhits=[] # a list of tuples (idx, tdchit), (idx, tdchit)
         self.vftxhits=[]  # as above
-        self.vtimes=[0]+[nan for i in range(1, 9)] # zeroth entry is dummy value
-        self.ttimes=[0]+[nan for i in range(1, 9)] # zeroth entry is dummy value
-        self.tots= [0]+[nan for i in range(1, 9)] # zeroth entry is dummy value
+        self.vtimes=np.array([0]+[nan for i in range(1, 9)]) # zeroth entry is dummy value
+        self.ttimes=np.array([0]+[nan for i in range(1, 9)]) # zeroth entry is dummy value
+        self.tots= np.array([0]+[nan for i in range(1, 9)]) # zeroth entry is dummy value
         
         self.tdiffs=[nan for i in range(5)]
 
@@ -80,14 +84,22 @@ class online_los(online_base.online_base):
                       x=(lambda n: self.ttimes[n]-self.avgvtime, 50, -4, 4),
                       y=(lambda n: self.tots[n], 100, 0, 500),
                       filllist=list(range(1,9)))
-
+        # pad7
+        h=self.mkHist("lospos1",
+                x=(lambda: self.lospos1[0], 200, -1, 1),
+                y=(lambda: self.lospos1[1], 200, -1, 1))
+        # pad7
+        h=self.mkHist("lospos2",
+                x=(lambda: self.lospos2[0], 200, -1, 1),
+                y=(lambda: self.lospos2[1], 200, -1, 1))
+ 
 
         #################################################
         self.mkCanvas("%s vftx cal"%name, 3, 3)
 
         for i in range(1, 9):
              h=self.mkHist("vftx_diff_%d"%i,
-                           x=(partial(lambda i: self.vtimes[i]+self.avgvtime+self.vftxoffsets[i], i), 2000, -4, 4))
+                           x=(partial(lambda i: self.vtimes[i]+0*self.vftxoffsets[i], i), 2000, -8, 8))
 
         #################################################
         self.mkCanvas("%s tamex cal"%name, 3, 3)
@@ -102,18 +114,24 @@ class online_los(online_base.online_base):
         for i in range(1, 5):
             for j in range(i+1, 5):
                 h=self.mkHist("time_diff_%d-%d_vs_%d-%d"%(i, i+4, j, j+4),
-                              x=(partial(lambda i: self.tdiffs[i], i), 200, -2, 2),
-                              y=(partial(lambda i: self.tdiffs[i], j), 200, -2, 2),
+                              x=(partial(lambda i: self.tdiffs[i], i), 400, -2, 2),
+                              y=(partial(lambda i: self.tdiffs[i], j), 400, -2, 2),
                               )
 
+        self.set_pmpos()
         self.procs.append(lambda: self.onEvent())
         self.finalize()
 
-    def set_pmpos(phase, dir=1):
-        self.pos=[(nan, nan)] # dummy entry for index zero
-        for i in range(1, 9):
-            x=phase+dir*i/8*(2*pi)
-            self.pos.append((cos(x), sin(x)))
+    def set_pmpos(self, phase=pi/8, dir=1):
+        # third element will be useful later
+        self.pos=np.array([[cos(pi*i*dir/4+phase), sin(pi*i*dir/4+phase), 0] for i in range(-1, 8)])
+        self.pos[0]=np.array([0, 0, 0]) # dummy values to simulate indices starting from 1
+        self.flatweights=np.sign(self.pos.dot(np.array([[1, 0, 0], [0, 1, 0]]).T)).T
+        if False:
+           print("pos:")
+           print(self.pos)
+           print(self.flatweights)
+
 
     def sanitize_range(self, n):
         """
@@ -143,6 +161,14 @@ class online_los(online_base.online_base):
                 self.tots[keff]=hits[0].tot/self.tot_scale[keff]
                 self.ttimes[keff]=hits[0].getTime()
        self.avgvtime=sum(self.vtimes)/8
+       self.vtimes[1:]-=self.avgvtime
        for i in range(1,5):
            self.tdiffs[i]=self.vtimes[i]-self.vtimes[i+4]
-
+       self.lospos1=self.flatweights.dot(self.vtimes/4.)
+       self.lospos2=np.array([nan, nan])
+       if not isnan(self.avgvtime): # better pos from vftx, use linear least squares
+           timecol=np.array([[0],[0],[1]]).T
+           var_ti=self.vtimes.dot(self.vtimes.T)
+           M= + 2*(self.vtimes)[1:,np.newaxis].dot(timecol)   - 2*self.pos[1:]
+           b=     (self.vtimes[1:])**2 -    var_ti 
+           self.lospos2=lstsq(M, b, rcond=None)[0][0:2]
