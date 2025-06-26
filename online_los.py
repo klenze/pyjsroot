@@ -18,8 +18,8 @@ class online_los(online_base.online_base):
         self.idxrange=list(range(offset+1, offset+8))
 
         # calibration parameters, to be overwritten by user as desired
-        self.vftxoffsets=[nan]+[0 for i in range(1, 9)]
-        self.tot_scale=[nan]+[1 for i in range(1,9)]
+        self.vftxoffsets=np.array([nan]+[0 for i in range(1, 9)])
+        self.tot_scale=np.array([nan]+[1 for i in range(1,9)])
 
 
         # stuff which is useful in multiple places and will be set by onEvent:
@@ -164,11 +164,23 @@ class online_los(online_base.online_base):
        self.vtimes[1:]-=self.avgvtime
        for i in range(1,5):
            self.tdiffs[i]=self.vtimes[i]-self.vtimes[i+4]
-       self.lospos1=self.flatweights.dot(self.vtimes/4.)
+       self.lospos1=self.flatweights.dot(self.vtimes/8.)
        self.lospos2=np.array([nan, nan])
        if not isnan(self.avgvtime): # better pos from vftx, use linear least squares
            timecol=np.array([[0],[0],[1]]).T
            var_ti=self.vtimes.dot(self.vtimes.T)
            M= + 2*(self.vtimes)[1:,np.newaxis].dot(timecol)   - 2*self.pos[1:]
            b=     (self.vtimes[1:])**2 -    var_ti 
-           self.lospos2=lstsq(M, b, rcond=None)[0][0:2]
+           res=lstsq(M, b, rcond=None)
+           self.lospos2=res[0][0:2]
+           return
+           print("\n\nM ~~~~~~~~~")
+           print(M)
+           print("*\nx ~~~~~~~~~")
+           print(res[0])
+           print("-\nb ~~~~~~~~~")
+           print(b)
+           print("=\n")
+           print(M.dot(res[0])-b)
+
+           print(self.lospos2)

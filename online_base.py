@@ -1,15 +1,64 @@
 import ROOT
 from functools import partial
+import ctypes
 
 http_inst=None
 
 class empty:
     pass
 
+def __declare_cling__(stuff):
+    assert True==ROOT.gInterpreter.Declare(stuff), "Running cling failed for declaration\n %s"%stuff
 
+def __run_cling__(stuff):
+    err=ctypes.c_int(0)
+    res=ROOT.gROOT.ProcessLineSync(stuff, err)
+    assert err.value==0, "Cling failed with err=%d while trying to process %s "%(err.value, stuff)
+    return res
 
-ROOT.gROOT.ProcessLine("gPad=nullptr;")
+__run_cling__("gPad=nullptr;")
 __gPad_nullptr__=ROOT.gPad
+
+__run_cling__(
+ """
+  std::vector<TH1*> hists{};
+  /*int addHist(const char* name)
+  {
+      if (auto* h=gDirectory->Get<TH1>(name))
+      {
+         hists.push_back(h);
+         return 0;
+      }
+      else
+      {
+         fprintf(stderr, "%s: failed to add object %s\\n", __PRETTY_FUNCTION__, name);
+         return 1;
+      }
+  };*/
+  auto  addHistogram=[&hists](long int raw)
+  {
+      auto* objPtr=static_cast<TObject*>((void*)raw);
+      auto* hPtr=dynamic_cast<TH1*>(objPtr);
+      if (!hPtr)
+         return 1;
+      hists.push_back(hPtr);
+      printf("Added %s to hists, new length is %d\\n", hPtr->GetName(), hists.size());
+      return 0;
+  };
+  auto clearAllHists=[&hists]()
+  {
+      int i{};
+      for (auto* h: hists)
+      {
+         h->Reset();
+         i++;
+      }
+      fprintf(stderr, "Cleared %d hists\\n", i);
+  };
+  """)
+
+
+__run_cling__("clearAllHists();")
 
 colors=[1,2,3,4,6,7,8,9]
 
@@ -63,8 +112,12 @@ class online_base:
             return
         for cv in self.canvases.values():
             http_inst.Register("/"+self.name, cv)
-        # todo: reset
- 
+        for h in self.hists:
+            assert 0==__run_cling__('addHistogram(0x%x);'%ROOT.addressof(h.hist)), "Adding histogram %s to reset list failed"%h.hist.GetName()
+        __run_cling__("clearAllHists()")
+        #assert 0==ROOT.addHistogram(h.hist), "Adding histogram %s to reset list failed"%h
+        http_inst.RegisterCommand("/reset", "clearAllHists()")
+        http_inst.SetItemField("/reset", "_fastcmd", "true")
     def process(self):
         for p in self.procs:
             p()
@@ -90,8 +143,14 @@ class online_base:
                 # whose bin content gets updated to be the max
                 drawnhist.hist.SetMaximum(1.2*(1+self.update_interval/self.nev)*m)
             for cv in self.canvases.values():
-                cv.Modified()
-                cv.Update()
+                i=0
+                while True:
+                    if not (pad:=cv.GetPad(i)):
+                        break
+                    pad.Modified()
+                    pad.Update()
+                    i+=1
+                print("Updated %d pads for canvas %s"%(i, cv.GetName()))
 
     def mkCanvas(self, name, xpos=1, ypos=1):
         assert name not in self.canvases

@@ -47,10 +47,6 @@ lmap=lambda *a,**kw:list(map(*a, **kw))
 
 #f=open(sys.argv[1], "br")
 #h=h101.H101(fd=f.fileno())
-#unpacker="/u/land/fake_cvmfs/11/extra_jan24p1/upexps_202506_g249/upexps/run/run_all --input-buffer=138Mi"
-#source="/lustre/r3b/202506_g249/lmd_stitched/main0102_0001.lmd"  # rolu 10mm x 10mm
-#lmd="/lustre/r3b/202506_g249/lmd_stitched/main0098_0001.lmd" # run with rolu closed to 1mm x 1mm
-
 
 
 d=None
@@ -73,12 +69,19 @@ def main():
       for k, v in pars.items():
           if not hasattr(los, k):
               print("%s: parameter %s is assigned to %s in config, but there is no such parameter."%(losno, k, v))
+              exit(1)
+          vold=getattr(los, k)
+          if type(vold)==np.ndarray and type(v)==list:
+              v=np.array(v, dtype=vold.dtype)
+          if type(vold)!=type(v):
+              print("%s: parameter %s is assigned to type %s in config, but should be of type %s."%(losno, k, type(v), type(vold)))
+              exit(1)
+          if hasattr(vold, "__len__") and len(vold) != len(v):
+              print("%s: parameter %s is assigned with a length of %d in config, but should have a length of %s."%(losno, k, len(v), len(vold)))
+              exit(1)
           setattr(los, k, v)
       onlines+=[los]
-      #los.vftxoffsets=[float("nan"), -2.102, -1.215, -0.5124, 0.08364,
-      #                 0.02885, 1.073, 1.845, 0.8041]
-      #los.tot_scale=np.array([float("nan"), 544.6, 546.1, 546.3, 545.2, 546.0, 552.9, 552.2, 548.5])
-      #los.tot_scale/=sum(los.tot_scale[1:9])/8
+      los.tot_scale/=sum(los.tot_scale[1:9])/8
    n, m=0,0
    #TPAT=d["TPAT"]
    while h.getevent() and not end:
