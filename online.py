@@ -1,4 +1,4 @@
-#!/usr/bin/env -S python3 -i
+#!/usr/bin/env -S python3 
 import numpy
 import h101
 import h101.tdc_cal
@@ -9,7 +9,7 @@ import math
 from math import *
 import ROOT
 import inspect
-import sys
+import sys, os
 import itertools
 import numpy as np
 import subprocess
@@ -34,8 +34,10 @@ def handle_sig_int(sig, frame, reason="Caught ^C"):
     if h:
         h.unpacker.kill()
     print("%s, dying"%reason)
+    os.kill(os.getpid(), 9)
+    
 
-#signal.signal(signal.SIGINT, handle_sig_int)
+signal.signal(signal.SIGINT, handle_sig_int)
 
 #upexps="/u/land/fake_cvmfs/11/extra_jan24p1/upexps/202503_s122/202503_s122"
 

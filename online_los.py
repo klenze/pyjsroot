@@ -4,8 +4,9 @@ from functools import partial
 from math import pi, sin, cos
 import numpy as np
 from numpy.linalg import lstsq # linear
+from numpy.linalg import norm
 
-#from scipy.optimize import least_squares # non-linear
+from scipy.optimize import least_squares # non-linear
 
 __tern__=lambda p, then, otherwise: [otherwise, then][bool(p)]
 
@@ -20,8 +21,8 @@ class online_los(online_base.online_base):
         # calibration parameters, to be overwritten by user as desired
         self.vftxoffsets=np.array([nan]+[0 for i in range(1, 9)])
         self.tot_scale=np.array([nan]+[1 for i in range(1,9)])
-
-
+        # 
+        self.newana=False
         # stuff which is useful in multiple places and will be set by onEvent:
         self.tamexhits=[] # a list of tuples (idx, tdchit), (idx, tdchit)
         self.vftxhits=[]  # as above
@@ -84,6 +85,8 @@ class online_los(online_base.online_base):
                       x=(lambda n: self.ttimes[n]-self.avgvtime, 50, -4, 4),
                       y=(lambda n: self.tots[n], 100, 0, 500),
                       filllist=list(range(1,9)))
+        #################################################
+        self.mkCanvas("%s lospos toys"%name, 3, 3)
         # pad7
         h=self.mkHist("lospos1",
                 x=(lambda: self.lospos1[0], 200, -1, 1),
@@ -92,8 +95,19 @@ class online_los(online_base.online_base):
         h=self.mkHist("lospos2",
                 x=(lambda: self.lospos2[0], 200, -1, 1),
                 y=(lambda: self.lospos2[1], 200, -1, 1))
- 
 
+        # pad 8: lospos x
+        h=self.mkHist("losposX",
+                x=(lambda: self.lospos1[0], 200, -0.5, 0.5),
+                y=(lambda: self.lospos2[0], 200, -0.5, 0.5))
+
+        h=self.mkHist("speed",
+                x=(lambda: self.c, 200, 0, 4),
+                y=(lambda: self.timedev, 200, 0, 1))
+
+
+
+ 
         #################################################
         self.mkCanvas("%s vftx cal"%name, 3, 3)
 
@@ -122,11 +136,18 @@ class online_los(online_base.online_base):
         self.procs.append(lambda: self.onEvent())
         self.finalize()
 
-    def set_pmpos(self, phase=pi/8, dir=1):
+    def set_pmpos(self, phase=-0*pi/8, dir=1):
+        #r=47.5 #mm
+        v=0.47 #
+        #v=10/0.4
+        r=1/v
+        #r=
+        #sign=np.sign
         # third element will be useful later
-        self.pos=np.array([[cos(pi*i*dir/4+phase), sin(pi*i*dir/4+phase), 0] for i in range(-1, 8)])
+        self.pos=np.array([[r*cos(pi*i*dir/4+phase), r*sin(pi*i*dir/4+phase), 0] for i in range(-1, 8)])
         self.pos[0]=np.array([0, 0, 0]) # dummy values to simulate indices starting from 1
-        self.flatweights=np.sign(self.pos.dot(np.array([[1, 0, 0], [0, 1, 0]]).T)).T
+        self.weights=-self.pos.dot(np.array([[1, 0, 0], [0, 1, 0]]).T).T
+        self.flatweights=np.sign(self.weights)
         if False:
            print("pos:")
            print(self.pos)
@@ -165,15 +186,23 @@ class online_los(online_base.online_base):
        for i in range(1,5):
            self.tdiffs[i]=self.vtimes[i]-self.vtimes[i+4]
        self.lospos1=self.flatweights.dot(self.vtimes/8.)
-       self.lospos2=np.array([nan, nan])
-       if not isnan(self.avgvtime): # better pos from vftx, use linear least squares
+       self.lospos2=self.weights.dot(self.vtimes/8.)
+       self.lospos3=np.array([nan, nan])
+       self.lospos4=np.array([nan, nan])
+       self.cost=np.array(5*[nan])
+       self.c=nan
+       self.timedev=nan
+       if isnan(self.avgvtime) or not self.newana:
+           return
+       # better pos from vftx, use linear least squares
+       if True:
            timecol=np.array([[0],[0],[1]]).T
            var_ti=self.vtimes.dot(self.vtimes.T)
            M= + 2*(self.vtimes)[1:,np.newaxis].dot(timecol)   - 2*self.pos[1:]
            b=     (self.vtimes[1:])**2 -    var_ti 
            res=lstsq(M, b, rcond=None)
-           self.lospos2=res[0][0:2]
-           return
+           self.lospos3=res[0][0:2]
+       if False: 
            print("\n\nM ~~~~~~~~~")
            print(M)
            print("*\nx ~~~~~~~~~")
@@ -182,5 +211,27 @@ class online_los(online_base.online_base):
            print(b)
            print("=\n")
            print(M.dot(res[0])-b)
-
            print(self.lospos2)
+       def loss(x, t, pmtno):
+          c=1
+          return c*(t-self.vtimes[pmtno])-norm(x[:2]-self.pos[pmtno,:2])
+
+       def totloss(x, pos):
+          t=x[0]
+          #c=1
+          return np.array([loss(x=pos, t=t, pmtno=i) for i in range(1, 9)])
+      #print(res.x, pow(var_ti, 0.5), res.cost)
+       #self.c=res.x[1]
+       self.timedev=pow(var_ti, 0.5)
+
+       def totloss1(x):
+           t=x[0]
+           pos=x[1:3]
+           return np.array([loss(x=pos, t=t, pmtno=i) for i in range(1, 9)])
+
+       res=least_squares(totloss1, [0, 0, 0])
+       self.lospos4=res.x
+       for i in range(1, 5):
+             res=least_squares(totloss, [0], x=getattr(self, "lospos%d"%i))
+             self.cost[i]=res.cost
+       print(cost)

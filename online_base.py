@@ -42,7 +42,6 @@ __run_cling__(
       if (!hPtr)
          return 1;
       hists.push_back(hPtr);
-      printf("Added %s to hists, new length is %d\\n", hPtr->GetName(), hists.size());
       return 0;
   };
   auto clearAllHists=[&hists]()
@@ -142,6 +141,7 @@ class online_base:
                 # the alternative would be to have an invisible base histogram
                 # whose bin content gets updated to be the max
                 drawnhist.hist.SetMaximum(1.2*(1+self.update_interval/self.nev)*m)
+            return
             for cv in self.canvases.values():
                 i=0
                 while True:
