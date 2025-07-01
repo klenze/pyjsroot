@@ -22,8 +22,8 @@ from time import sleep
 
 import online_base
 import online_los
-
-from config import unpacker, source, port, losparams
+import online_sync
+from config import unpacker, source, port, losparams, tdcsync
 
 end=False
 
@@ -56,7 +56,7 @@ d=None
 def main():
    global end, d
    h101.tdc_cal.readcals("cal.json")
-   h101.tdc_cal.filterre=re.compile("LOS.*")
+   h101.tdc_cal.filterre=re.compile("(LOS|TOF).*")
    h=h101.mkh101(inputs=source, unpacker=unpacker)
    #h.tpat_mask=0x1
    d=h.getdict()
@@ -84,13 +84,16 @@ def main():
           setattr(los, k, v)
       onlines+=[los]
       los.tot_scale/=sum(los.tot_scale[1:9])/8
+   if len(tdcsync)>1:
+      onlines.append(online_sync.online_sync("tdc sync", d, tdcsync))
    n, m=0,0
    #TPAT=d["TPAT"]
    while h.getevent() and not end:
       n+=1
-      if (not n%100):
+      if (not n%1000):
           print(m, n)
           ROOT.gSystem.ProcessEvents()
+          #print(d)
           if not n%12000:
                h101.tdc_cal.writecals("cal.json")
 
