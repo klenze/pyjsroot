@@ -1,6 +1,12 @@
 #!/usr/bin/env -S python3 
 import numpy
 import h101
+
+
+import sys, os
+os.environ["DISPLAY"]=""
+
+
 import h101.tdc_cal
 import numpy as np
 from numpy.linalg import norm
@@ -9,7 +15,6 @@ import math
 from math import *
 import ROOT
 import inspect
-import sys, os
 import itertools
 import numpy as np
 import subprocess
@@ -22,7 +27,9 @@ from time import sleep
 
 import online_base
 import online_los
-import online_sync
+import online_tdcsync
+
+import online_rolu
 from config import unpacker, source, port, losparams, tdcsync
 
 end=False
@@ -56,7 +63,7 @@ d=None
 def main():
    global end, d
    h101.tdc_cal.readcals("cal.json")
-   h101.tdc_cal.filterre=re.compile("(LOS|TOF).*")
+   h101.tdc_cal.filterre=re.compile("^(LOS|TOF|ROLU|TIME).*")
    h=h101.mkh101(inputs=source, unpacker=unpacker)
    #h.tpat_mask=0x1
    d=h.getdict()
@@ -84,12 +91,16 @@ def main():
           setattr(los, k, v)
       onlines+=[los]
       los.tot_scale/=sum(los.tot_scale[1:9])/8
+   if True:
+       onlines.append(online_rolu.online_rolu("rolu", d["ROLU1VT"]))
    if len(tdcsync)>1:
-      onlines.append(online_sync.online_sync("tdc sync", d, tdcsync))
+      onlines.append(online_tdcsync.online_tdcsync("tdc sync", d, tdcsync))
+   print(onlines)
    n, m=0,0
    #TPAT=d["TPAT"]
    while h.getevent() and not end:
       n+=1
+      print(d["TIMESTAMP_MUSIC"], d["TIMESTAMP_BUS"], d["TIMESTAMP_MUSIC"]-d["TIMESTAMP_BUS"])
       if (not n%1000):
           print(m, n)
           ROOT.gSystem.ProcessEvents()
@@ -118,6 +129,7 @@ if __name__=="__main__":
     except Exception as e:
         if h:
             h.unpacker.kill()
+        #handle_sig_int(0, 0, "Exception")
         raise e
 
 

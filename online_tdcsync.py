@@ -14,7 +14,7 @@ class tdcchan:
             return self.arr[self.idx][0].getTime()
         return nan
 
-class online_sync(online_base.online_base):
+class online_tdcsync(online_base.online_base):
     def __init__(self, name, d, channels):
         super().__init__(name)
         chanlist=[tdcchan("%s[%d]"%(arr, idx), d[arr], idx) for arr,idx in channels]

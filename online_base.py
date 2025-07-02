@@ -111,6 +111,7 @@ class online_base:
             return
         for cv in self.canvases.values():
             http_inst.Register("/"+self.name, cv)
+            print("Registering canvas %s/%s"%(self.name, cv))
         for h in self.hists:
             assert 0==__run_cling__('addHistogram(0x%x);'%ROOT.addressof(h.hist)), "Adding histogram %s to reset list failed"%h.hist.GetName()
         __run_cling__("clearAllHists()")
@@ -152,14 +153,22 @@ class online_base:
                     i+=1
                 print("Updated %d pads for canvas %s"%(i, cv.GetName()))
 
-    def mkCanvas(self, name, xpos=1, ypos=1):
+    def mkCanvas(self, name, xpos=1, ypos=None):
+        if ypos==None:
+            n=xpos
+            xpos=math.floor(pow(n, 0.5))
+            ypos=math.ceil(self.n/xpos)
+ 
         assert name not in self.canvases
         cv=ROOT.TCanvas(name, name, 1000, 1000)
         self.canvases[name]=cv
         cv.Divide(xpos, ypos)
         self.current=[cv, 0]
+        print("Created Canvas %s"%name)
         return cv
 
+    def __str__(self):
+        return "%s(\"%s\")"%(self.type, self.name)
     def next_pad(self):
         cv=self.current[0]
         assert cv != None, "Create a canvas before making histograms"
