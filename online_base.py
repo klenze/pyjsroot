@@ -1,6 +1,7 @@
 import ROOT
 from functools import partial
-import ctypes
+import ctypes, math
+from numpy import log10, sign, abs
 
 http_inst=None
 
@@ -114,7 +115,7 @@ class online_base:
             print("Registering canvas %s/%s"%(self.name, cv))
         for h in self.hists:
             assert 0==__run_cling__('addHistogram(0x%x);'%ROOT.addressof(h.hist)), "Adding histogram %s to reset list failed"%h.hist.GetName()
-        __run_cling__("clearAllHists()")
+        #__run_cling__("clearAllHists()")
         #assert 0==ROOT.addHistogram(h.hist), "Adding histogram %s to reset list failed"%h
         http_inst.RegisterCommand("/reset", "clearAllHists()")
         http_inst.SetItemField("/reset", "_fastcmd", "true")
@@ -157,7 +158,8 @@ class online_base:
         if ypos==None:
             n=xpos
             xpos=math.floor(pow(n, 0.5))
-            ypos=math.ceil(self.n/xpos)
+            ypos=math.ceil(n/xpos)
+            #print("%s: Created a %d x %d canvas for %d subpads"%(name, xpos, ypos, n))
  
         assert name not in self.canvases
         cv=ROOT.TCanvas(name, name, 1000, 1000)
@@ -178,6 +180,12 @@ class online_base:
         return res
     def reuse_pad(self):
         self.current[1]-=1
+    def logbins(self, n, min, max):
+        pass # TODO
+
+    def symlog(self, x):
+        return sign(x)*log10(abs(x))
+
 
     def mkHist(self, name, 
                x, # x[0] is a callable which returns the quantity you want to plot
@@ -193,7 +201,9 @@ class online_base:
 
                log="", # any of x, y, z, e.g. "yz"
                cond=lambda *args: True,
-               color=None # automatically assign color
+               color=None, # automatically assign color
+               xlabels=None,
+               ylabels=None,
                ):
         res=empty()
         res.cv=cv
@@ -205,20 +215,31 @@ class online_base:
         res.filllist=filllist
         if y==None:
             res.hist=ROOT.TH1I(objname, name, *x[1:])
-            res.hist.SetMinimum(int("y" in log))
+            res.hist.SetMinimum(int("y" in log)*0.8)
             res.fill=lambda: [res.hist.Fill(x[0](*p)) for p in __tuplify__(res.filllist) if res.cond(*p)]
         else:
             res.hist=ROOT.TH2I(objname, name, *x[1:], *y[1:])
-            res.hist.SetMinimum(int("z" in log))
+            res.hist.SetMinimum(int("z" in log)*0.8)
             if drawopts==None:
                 drawopts="colz"
             res.fill=lambda: [res.hist.Fill(x[0](*p), y[0](*p)) for p in __tuplify__(res.filllist) if res.cond(*p)]
+        if x[0]==None:
+            res.fill=lambda: None # not filled automatically
         if title!=None:
             res.hist.SetTitle(title)
         if xtitle!=None:
             res.hist.GetXaxis().SetTitle(xtitle)
         if ytitle!=None:
             res.hist.GetYaxis().SetTitle(ytitle)
+        if xlabels!=None:
+            axis=res.hist.GetXaxis()
+            for i, string in enumerate(xlabels, 1):
+                axis.SetBinLabel(i, string)
+        if ylabels!=None:
+            axis=res.hist.GetYaxis()
+            for i, string in enumerate(ylabels, 1):
+                axis.SetBinLabel(i, string)
+
         for c in log:
             res.cv.__getattribute__("SetLog"+c)()
         if drawopts!=None:

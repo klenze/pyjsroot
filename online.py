@@ -23,14 +23,24 @@ from functools import partial
 import os.path
 import signal
 
-from time import sleep
+from time import sleep, time
 
 import online_base
 import online_los
 import online_tdcsync
-
+import online_wrsync
 import online_rolu
-from config import unpacker, source, port, losparams, tdcsync
+import online_tof
+
+assert len(sys.argv)<=2, "Usage: %s [config]"%sys.argv[0]
+if len(sys.argv)==2:
+    cfgfile=sys.argv[1]
+else:
+    cfgfile="config"
+
+
+cfg=__import__(cfgfile, globals(), locals(), ["unpacker", "source", "options", "port", "losparams", "tdcsync", "wrsync"], 0)
+
 
 end=False
 
@@ -60,11 +70,13 @@ lmap=lambda *a,**kw:list(map(*a, **kw))
 
 d=None
 
+use_tof="|TOF"
+
 def main():
    global end, d
    h101.tdc_cal.readcals("cal.json")
-   h101.tdc_cal.filterre=re.compile("^(LOS|TOF|ROLU|TIME).*")
-   h=h101.mkh101(inputs=source, unpacker=unpacker)
+   h101.tdc_cal.filterre=re.compile("^(LOS|ROLU|TIME%s).*"%use_tof)
+   h=h101.mkh101(inputs=cfg.source, unpacker=cfg.unpacker, options=cfg.options)
    #h.tpat_mask=0x1
    d=h.getdict()
 #globals().update(d)
@@ -72,8 +84,9 @@ def main():
    if False:
       print(d)
       exit(1)
-   online_base.http_inst=ROOT.THttpServer("http:%d"%port)
-   for losno, pars in losparams.items():
+   online_base.http_inst=ROOT.THttpServer("http:%d"%cfg.port)
+   online_base.http_inst.SetTopName("%s"%cfg.source)
+   for losno, pars in cfg.losparams.items():
       los=online_los.online_los(losno, d[losno+"VT"], d[losno+"TT_tot"], offset=0)
       for k, v in pars.items():
           if not hasattr(los, k):
@@ -92,19 +105,29 @@ def main():
       onlines+=[los]
       los.tot_scale/=sum(los.tot_scale[1:9])/8
    if True:
-       onlines.append(online_rolu.online_rolu("rolu", d["ROLU1VT"]))
-   if len(tdcsync)>1:
-      onlines.append(online_tdcsync.online_tdcsync("tdc sync", d, tdcsync))
+       onlines.append(online_rolu.online_rolu("rolu", d["ROLU1TT_tot"]))
+   if use_tof!="":
+       onlines.append(online_tof.online_tof("tof", d))
+   if len(cfg.tdcsync)>1:
+      onlines.append(online_tdcsync.online_tdcsync("tdc sync", d, cfg.tdcsync))
+   if len(cfg.wrsync)>0:
+      onlines.append(online_wrsync.online_wrsync("wr sync", d, cfg.wrsync))
    print(onlines)
    n, m=0,0
    #TPAT=d["TPAT"]
+   last_update=time()
+   last_count=0
    while h.getevent() and not end:
       n+=1
-      print(d["TIMESTAMP_MUSIC"], d["TIMESTAMP_BUS"], d["TIMESTAMP_MUSIC"]-d["TIMESTAMP_BUS"])
-      if (not n%1000):
-          print(m, n)
+      #print(d["TIMESTAMP_MUSIC"], d["TIMESTAMP_BUS"], d["TIMESTAMP_MUSIC"]-d["TIMESTAMP_BUS"])
+      if (time()>last_update+1):
+          print("processed %12d of %12d events, %d events in the last second"%(m, n, m-last_count))
+          last_count=m
+          last_update=time()
           ROOT.gSystem.ProcessEvents()
-          #print(d)
+          if (int(time())%10==0):
+              print(d)
+              pass
           if not n%12000:
                h101.tdc_cal.writecals("cal.json")
 
@@ -116,6 +139,9 @@ def main():
       for on in onlines:
           on.process()
       m+=1
+   if cfg.source.find("lmd")==-1:
+       print("stream data ended, will quit now.")
+
    end=False
    print("data finished or ^Ced, running jsroot only, ^C to exit")
    while not end:
@@ -127,6 +153,9 @@ if __name__=="__main__":
     try:
         main()
     except Exception as e:
+        if type(e)==KeyError:
+            print("Key error, just in case here is the main dict")
+            print(d)
         if h:
             h.unpacker.kill()
         #handle_sig_int(0, 0, "Exception")

@@ -45,7 +45,7 @@ class online_los(online_base.online_base):
                       filllist=self.tamexhits)
 
         # pad 2: multiplicities
-        h=self.mkHist("VFTX multiplicites",
+        h=self.mkHist("VFTX multiplicities",
                       x=(lambda n,lst: self.sanitize_range(n), 16, 0.5, 16.5),
                       y=(lambda n,lst: len(lst), 10, 0, 10),
                       filllist=self.vftxdict)
@@ -57,8 +57,8 @@ class online_los(online_base.online_base):
                       filllist=self.tamexdict)
         # pad 3: tot per channel
         h=self.mkHist("ToTs",
-                      y=(lambda n, h:h.tot, 200,   0,  1000),
-                      x=(lambda n, h: n,      8, 0.5,   8.5),
+                      y=(lambda n, h:h.tot, 500,   0,  500),
+                      x=(lambda n, h: n,       8, 0.5,   8.5),
                       filllist=self.tamexhits,
                       )
         # pad 4: avg tot -- for people with lambda allergies
@@ -71,7 +71,7 @@ class online_los(online_base.online_base):
                    return nan
            return avg
         h=self.mkHist("avgToT",
-                      x=(avgTot, 200, 0, 1000))
+                      x=(avgTot, 200, 0, 500))
         # pad 5: odd vs even PMTs -- lambda version
         #h=self.mkHist("oddEvenDiff",
         #    x=(lambda: sum(map(lambda k: pow(-1, k)*__tern__((h:=self.vftxdict.get(k)), k.getTime(), nan)))),
@@ -87,14 +87,21 @@ class online_los(online_base.online_base):
                       filllist=list(range(1,9)))
         #################################################
         self.mkCanvas("%s lospos toys"%name, 3, 3)
+        h=self.mkHist("PMT positions",
+                      x=(None, 5, -1.2, 1.2),
+                      y=(None, 5, -1.2, 1.2),
+                      xtitle="<-Mes-- (-x, a.u.) --Wix->",
+                      ytitle="<-Down-- (+y, a.u.) --Up-->")
+        self.pmposhist=h
+
         # pad7
         h=self.mkHist("lospos1",
-                x=(lambda: self.lospos1[0], 200, -1, 1),
-                y=(lambda: self.lospos1[1], 200, -1, 1))
+                x=(lambda: self.lospos1[0], 200, -2, 2),
+                y=(lambda: self.lospos1[1], 200, -2, 2))
         # pad7
         h=self.mkHist("lospos2",
-                x=(lambda: self.lospos2[0], 200, -1, 1),
-                y=(lambda: self.lospos2[1], 200, -1, 1))
+                x=(lambda: self.lospos2[0], 200, -2, 2),
+                y=(lambda: self.lospos2[1], 200, -2, 2))
 
         # pad 8: lospos x
         h=self.mkHist("losposX",
@@ -128,15 +135,15 @@ class online_los(online_base.online_base):
         for i in range(1, 5):
             for j in range(i+1, 5):
                 h=self.mkHist("time_diff_%d-%d_vs_%d-%d"%(i, i+4, j, j+4),
-                              x=(partial(lambda i: self.tdiffs[i], i), 400, -2, 2),
-                              y=(partial(lambda i: self.tdiffs[i], j), 400, -2, 2),
+                              x=(partial(lambda i: self.tdiffs[i], i), 400, -4, 4),
+                              y=(partial(lambda i: self.tdiffs[i], j), 400, -4, 4),
                               )
 
         self.set_pmpos()
         self.procs.append(lambda: self.onEvent())
         self.finalize()
 
-    def set_pmpos(self, phase=-0*pi/8, dir=1):
+    def set_pmpos(self, phase=3*pi/8, dir=-1):
         #r=47.5 #mm
         v=0.47 #
         #v=10/0.4
@@ -146,6 +153,8 @@ class online_los(online_base.online_base):
         # third element will be useful later
         self.pos=np.array([[r*cos(pi*i*dir/4+phase), r*sin(pi*i*dir/4+phase), 0] for i in range(-1, 8)])
         self.pos[0]=np.array([0, 0, 0]) # dummy values to simulate indices starting from 1
+        for i,p in enumerate(self.pos[1:], 1):
+            self.pmposhist.hist.Fill(p[0]/r, p[1]/r, i)
         self.weights=-self.pos.dot(np.array([[1, 0, 0], [0, 1, 0]]).T).T
         self.flatweights=np.sign(self.weights)
         if False:
@@ -179,6 +188,7 @@ class online_los(online_base.online_base):
             if not isnan(keff:=self.sanitize_range(k)):
                 for h in hits:
                     self.tamexhits.append((keff, h))
+                #print(hits[0].totc, hits[0].tot)
                 self.tots[keff]=hits[0].tot/self.tot_scale[keff]
                 self.ttimes[keff]=hits[0].getTime()
        self.avgvtime=sum(self.vtimes)/8

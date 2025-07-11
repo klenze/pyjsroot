@@ -42,19 +42,15 @@ class online_rolu(online_base.online_base):
         L=3
         U=4
         h=self.mkHist("Counts",
-                x=(lambda: tristate(R in self.tamexhits, L in self.tamexhits), 4, -1.5, 2.5),
-                y=(lambda: tristate(O in self.tamexhits, U in self.tamexhits), 4, -1.5, 2.5),
+                x=(lambda: tristate(R in self.tamexdict, L in self.tamexdict), 4, -1.5, 2.5),
+                y=(lambda: tristate(O in self.tamexdict, U in self.tamexdict), 4, -1.5, 2.5),
                 log="z",
 #                xtitle="L,none,R,both",
 #                ytitle="U,none,O,both"
+
+                xlabels=["L", "\\emptyset", "R", "LR"],
+                ylabels=["U", "\\emptyset", "O", "UO"]
                 )
-        for ax, labels in [
-                ('X', ["", "L", "\\emptyset", "R", "LR", ""]),
-                ('Y', ["", "U", "\\emptyset", "O", "UO", ""]),
-                ]:
-            axis=getattr(h.hist, "Get%saxis"%ax)()
-            for i, string in enumerate(labels):
-                axis.SetBinLabel(i, string)
         self.procs.append(self.onEvent)
         self.finalize()
  
@@ -69,5 +65,6 @@ class online_rolu(online_base.online_base):
                     self.tamexhits.append((keff, h))
                 self.tots[keff]=hits[0].tot/self.tot_scale[keff]
                 self.ttimes[keff]=hits[0].getTime()
+       #print(self.tamexdict, self.tamexhits)
 
 
