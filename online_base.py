@@ -118,6 +118,7 @@ class online_base:
         #__run_cling__("clearAllHists()")
         #assert 0==ROOT.addHistogram(h.hist), "Adding histogram %s to reset list failed"%h
         http_inst.RegisterCommand("/reset", "clearAllHists()")
+        http_inst.SetIcon("/reset", "/rootsys/share/root/icons/ed_delete.png")
         http_inst.SetItemField("/reset", "_fastcmd", "true")
     def process(self):
         for p in self.procs:

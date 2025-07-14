@@ -31,15 +31,16 @@ import online_tdcsync
 import online_wrsync
 import online_rolu
 import online_tof
+import online_example
 
-assert len(sys.argv)<=2, "Usage: %s [config]"%sys.argv[0]
+assert len(sys.argv)<=2, "Usage: %s [config].py"%sys.argv[0]
 if len(sys.argv)==2:
-    cfgfile=sys.argv[1]
+    cfgfile=sys.argv[1][:-3]
 else:
     cfgfile="config"
 
 
-cfg=__import__(cfgfile, globals(), locals(), ["unpacker", "source", "options", "port", "losparams", "tdcsync", "wrsync"], 0)
+cfg=__import__(cfgfile, globals(), locals(), ["unpacker", "source", "options", "port", "losparams", "tdcsync", "wrsync", "example"], 0)
 
 
 end=False
@@ -112,6 +113,8 @@ def main():
       onlines.append(online_tdcsync.online_tdcsync("tdc sync", d, cfg.tdcsync))
    if len(cfg.wrsync)>0:
       onlines.append(online_wrsync.online_wrsync("wr sync", d, cfg.wrsync))
+   for i in cfg.example:
+      onlines.append(online_example.online_example("example %s"%i, d[i]))
    print(onlines)
    n, m=0,0
    #TPAT=d["TPAT"]
