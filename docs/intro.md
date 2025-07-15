@@ -30,7 +30,7 @@ Also, R3BFastTofLosOnlineSpectra will not be very flexible, if I want to pulser 
 
 Obviously, I did not do that. Instead, I had started out with pyh101 plus a basic framework for setting up an online analysis and a rudimentary los online analysis.
 
-I wrote another python class for tdc syncs, which took me less than an hour, and added about five lines of code to instantiate it (and enable unpacking for TOF) in my main script.
+I wrote another Python class for showing tdc syncs online, which took me less than an hour, and added about five lines of code to instantiate it (and enable unpacking for TOF) in my main script.
 
 Finally, I added the lines the pulsed channels to the configuration:
 ```

@@ -6,7 +6,7 @@
 
 ### Present state of R3B analysis software
 
-* See [into.md](intro.md) for an estimate of how much boilerplate is added which each new detector.
+* See [intro.md](intro.md) for an estimate of how much boilerplate is added which each new detector.
 
 * UCESB is very good at what it does, but its raw output on a mapped level is hard to interpret, especially for ``ZERO_SUPPRESS_MULTI``.
 
@@ -45,25 +45,25 @@ In the simplest case (single histograms), a declaration reads like this:
 
 In the corresponding cxx file, we run over this histogram in different places.
 
-620 lines deep in the ::Init() method, it is initialized:
+620 lines deep in the Init() method, it is initialized:
 ```
 fh2_Califa_coinPhi =
         R3B::root_owned<TH2F>("fh2_Califa_phi_correlations", "Califa phi correlations", 600, -190, 190, 600, -190, 190);
 ```
 A few more lines are then spent to create a TCanvas, set axis labels and draw it using "COLZ".
 
-The next place we find it is an exceptionally short method, ::Reset(), which clears all histograms. Our histogram is mentioned 94 lines into that method:
+The next place we find it is an exceptionally short method, Reset(), which clears all histograms. Our histogram is mentioned 94 lines into that method:
 ```
         fh2_Califa_coinPhi->Reset();
 ```
 
-The final place it is used is where it is actually filled, 302 lines within the ::Exec method.
+The final place it is used is where it is actually filled, 302 lines within the Exec method.
 
 ```
                 fh2_Califa_coinPhi->Fill(califa_phi[i1], califa_phi[i2]);
 ```
 
-The lack of a destructor is by design, and the fact that the pointer is uninitialized between object construction and ::Init() could be fixed fairly easily by using default member initalizers. Also, iterating through all the histograms for ::Reset() could be avoided fairly easily by adding any allocated histogram to a vector. Still, that leaves three different places where the histogram pointer appears, which is about two too many.
+The lack of a destructor is by design, and the fact that the pointer is uninitialized between object construction and Init() could be fixed fairly easily by using default member initalizers. Also, iterating through all the histograms for Reset() could be avoided fairly easily by adding any allocated histogram to a vector. Still, that leaves three different places where the histogram pointer appears, which is about two too many.
 
 ## Prior work
 
@@ -92,7 +92,7 @@ R3BFoo::~R3BFoo()
 }
 ```
 
-Whoever writes such code clearly has an insufficient understanding of object ownership. FairRootManager::GetObject will not return a unique pointer per call just to do as you please with, it will return a pointer to an object which is also used in other places, and you have no business deleting it. Cargo-cult programming on the level of "I have seen others delete their pointer members in the destructor, hence I should call delete on all of my member pointers" does not cut it. The unneccessary if is just adding insult to injury. 
+Whoever writes such code clearly has an insufficient understanding of object ownership. FairRootManager::GetObject() will not return a unique pointer per call just to do as you please with, it will return a pointer to an object which is also used in other places, and you have no business deleting it. Cargo-cult programming on the level of "I have seen others delete their pointer members in the destructor, hence I should call delete on all of my member pointers" does not cut it. The unneccessary if is just adding insult to injury. 
 
 So as I was starting from the scratch in any case, I recognized that getting contributors to the point where they can contribute safe Python is much easier than getting them to the point where they can contribute safe C++. Less stuff to unlearn, for one thing.
 
@@ -140,7 +140,7 @@ There are clear advantages to running as a web server. JSROOT mostly does what I
 | Support for monte carlo simulation | TVirtualMC (with the backend being Geant4 99% of the time) | Nope! ("do one thing, do it well") Use Geant4, write json|
 | New classes required whenever | ... you add a new detector | ... you want new functionality (e.g. a new calibration procedure)|
 | Support for detectors | All of them! | Whatever you add |
-| LOC |114k (FairRoot) + 280k (R3BRoot) + 10k (R3BParams) | 7600 (pyh101) + 1100 (jsonline) |
+| LOC |114k (FairRoot) + 280k (R3BRoot) + 10k (R3BParams) | 4600 (ext\_data\_client) 1300 (pyh101) + 1100 (jsonline) |
 | Most common pitfall | forgot a change in a copy+rename orgy | [lambda.md](lambda.md) |
 
 

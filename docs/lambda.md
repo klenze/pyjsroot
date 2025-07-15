@@ -1,4 +1,4 @@
-== Lambdas 101, the short version ==
+## Lambdas 101, the short version
 Lambda expressions in Python define anonymous functions.
 
 Say we have a higher order function:
@@ -23,15 +23,15 @@ Luckily, we do not have to, instead we can use:
 applytwice(lambda x: x+1, 40)
 ```
 
-The general syntax is "lambda ", followed by a comma separated list of variable names which denote arguments your function will take (or nothing if you want a function without arguments), followed by ":" followed by an expression which specifies what the function should return.
+The general syntax is roughly "lambda", followed by a comma separated list of variable names which denote arguments your function will take (or nothing if you want a function without arguments), followed by ":" followed by an expression which specifies what the function should return.
 
 Google [python lambda](https://google.com/search?q=python+lambda) for more examples and tutorials on this.
 
-== How Python lambda expressions are weird ==
+## How Python lambda expressions are weird
 
 Python lambdas are a bit weird in how they treat free variables (which is the same as for inner functions). Rather then capturing them by reference at the time the lambda is defined, they will remember the scope in which the lambda was defined (prolonging its life if required) and interpret any free variables with respect to that scope.
 
-Say we want to generate a list of functions which take one argument, and add i to it, where i is their position in the list, so
+Say we want to generate a list of functions which take one argument, and add n to it, where n is their position in the list, so
 ```
 addN=[lambda x: x+0, lambda x: x+1, lambda x: x+2]
 ```
